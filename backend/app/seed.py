@@ -1,7 +1,10 @@
-"""Idempotent seed data: categories and templates only (no transactions)."""
+"""Idempotent seed data: categories, templates and the admin account."""
+import os
+
 from sqlalchemy.orm import Session
 
-from .models import Category, Direction, Owner, Template
+from .models import Category, Direction, Owner, Template, User
+from .security import hash_password
 
 # (name, direction, sort_order, hint)
 SEED_CATEGORIES = [
@@ -71,7 +74,26 @@ def seed_templates(db: Session) -> None:
     db.commit()
 
 
+def seed_admin_user(db: Session) -> None:
+    """Create the configured admin account if it does not already exist.
+
+    Existing accounts are left untouched so a changed password is never
+    overwritten by a restart.
+    """
+    username = os.environ.get("HEARTHLEDGER_USERNAME", "admin")
+    password = os.environ.get("HEARTHLEDGER_PASSWORD", "hearthledger")
+
+    exists = db.query(User).filter(User.username == username).first()
+    if exists is None:
+        db.add(User(username=username, password_hash=hash_password(password)))
+        db.commit()
+        print(f"[seed] created account: {username}")
+    else:
+        print(f"[seed] account already exists: {username}")
+
+
 def seed(db: Session) -> None:
     """Seed everything; safe to call repeatedly."""
     seed_categories(db)
     seed_templates(db)
+    seed_admin_user(db)

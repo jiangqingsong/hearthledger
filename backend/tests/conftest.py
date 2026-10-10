@@ -39,6 +39,13 @@ from fastapi.testclient import TestClient  # noqa: E402
 @pytest.fixture(scope="session")
 def client():
     with TestClient(app) as c:
+        # Authenticate the shared client so existing route tests hit protected
+        # endpoints with a valid session cookie.
+        login = c.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "hearthledger"},
+        )
+        assert login.status_code == 200, login.text
         yield c
 
 

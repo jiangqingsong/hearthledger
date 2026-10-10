@@ -11,11 +11,34 @@ import type {
 
 const BASE = '/api';
 
-async function http<T>(path: string, init?: RequestInit): Promise<T> {
+/** Called whenever an authenticated request receives a 401 (see `skipAuthRedirect`). */
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(fn: UnauthorizedHandler | null) {
+  unauthorizedHandler = fn;
+}
+
+interface HttpInit extends RequestInit {
+  /**
+   * Skip the global 401 handling. Used for the login call (401 means "wrong
+   * credentials", not "session expired") and the `me` bootstrap check.
+   */
+  skipAuthRedirect?: boolean;
+}
+
+async function http<T>(path: string, init?: HttpInit): Promise<T> {
+  const { skipAuthRedirect = false, ...rest } = init ?? {};
+
   const res = await fetch(BASE + path, {
     headers: { 'Content-Type': 'application/json' },
-    ...init,
+    credentials: 'include',
+    ...rest,
   });
+
+  if (res.status === 401 && !skipAuthRedirect) {
+    unauthorizedHandler?.();
+  }
 
   if (!res.ok) {
     let message = `HTTP ${res.status}`;
@@ -171,4 +194,22 @@ export const api = {
 
   // Backup
   getBackup: () => http<{ ok: boolean; file: string }>('/backup'),
+
+  // Auth
+  login: (username: string, password: string) =>
+    http<{ username: string }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username, password }),
+      skipAuthRedirect: true,
+    }),
+
+  logout: () => http<{ ok: true }>('/auth/logout', { method: 'POST' }),
+
+  me: () => http<{ username: string }>('/auth/me', { skipAuthRedirect: true }),
+
+  changePassword: (current_password: string, new_password: string) =>
+    http<{ ok: true }>('/auth/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ current_password, new_password }),
+    }),
 };

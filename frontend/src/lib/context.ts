@@ -14,6 +14,10 @@ export interface AppContextValue {
   currentMonth: string;
   openAdd: () => void;
   openEdit: (tx: Transaction) => void;
+  username: string | null;
+  authenticated: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 export const AppContext = createContext<AppContextValue | null>(null);
