@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>HearthLedger · 家庭账本</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        page: '#f9f9f7',
+        surface: '#fcfcfb',
+        ink: '#0b0b0b',
+        ink2: '#52514e',
+        muted: '#6b6a63',
+        line: '#e1e0d9',
+        axis: '#c3c2b7',
+        good: '#0ca30c', goodText: '#006300',
+        bad: '#d03b3b',
+        brand: { DEFAULT: '#2a78d6', 600: '#256abf', 700: '#1c5cab', 50: '#eef5fd' },
+      },
+      fontFamily: {
+        sans: ['system-ui','-apple-system','"PingFang SC"','"Segoe UI"','sans-serif'],
+      },
+    }
+  }
+}
+</script>
+<style>
+  html, body { height: 100%; }
+  .num { font-variant-numeric: tabular-nums; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #e1e0d9; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #c3c2b7; }
+  .card { background:#fcfcfb; border:1px solid #e1e0d9; border-radius:14px; box-shadow:0 1px 2px rgba(11,11,11,.04); }
+  .seg-btn { transition: all .15s ease; }
+</style>
+</head>
+<body class="bg-page text-ink font-sans antialiased">
+
+<div class="flex h-screen">
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="w-60 shrink-0 bg-surface border-r border-line flex flex-col">
+    <div class="h-16 flex items-center gap-2.5 px-5 border-b border-line">
+      <div class="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white font-semibold text-sm">H</div>
+      <div class="leading-tight">
+        <div class="font-semibold text-[15px]">HearthLedger</div>
+        <div class="text-[11px] text-muted">家庭账本</div>
+      </div>
+    </div>
+
+    <nav class="flex-1 px-3 py-4 space-y-1">
+      <button data-view="dashboard" class="nav w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-brand bg-brand/10">
+        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        仪表盘
+      </button>
+      <button data-view="transactions" class="nav w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink2 hover:bg-black/[.04]">
+        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        流水
+      </button>
+      <button data-view="reports" class="nav w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink2 hover:bg-black/[.04]">
+        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M7 16v-4M12 16V7M17 16v-7"/></svg>
+        报表
+      </button>
+      <button data-view="balance" class="nav w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink2 hover:bg-black/[.04]">
+        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7l9 6 9-6"/></svg>
+        资产负债
+      </button>
+      <button data-view="categories" class="nav w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-ink2 hover:bg-black/[.04]">
+        <svg class="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 13 13 20l-8 1 1-8 7-7a2 2 0 0 1 2.8 0l4.2 4.2a2 2 0 0 1 0 2.8z"/><path d="M14.5 7.5l2 2"/></svg>
+        分类管理
+      </button>
+    </nav>
+
+    <div class="px-4 py-4 border-t border-line space-y-3">
+      <div class="flex items-center gap-2 text-xs text-muted">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+        数据保存在本地 · 单文件
+      </div>
+      <div class="flex -space-x-2">
+        <div class="w-8 h-8 rounded-full bg-brand text-white grid place-items-center text-xs font-medium ring-2 ring-surface">我</div>
+        <div class="w-8 h-8 rounded-full bg-[#eb6834] text-white grid place-items-center text-xs font-medium ring-2 ring-surface">媳</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== Main ===== -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <header class="h-16 shrink-0 bg-surface border-b border-line flex items-center justify-between px-6">
+      <div class="flex items-center gap-3">
+        <h1 id="page-title" class="text-lg font-semibold">仪表盘</h1>
+        <div class="hidden md:flex items-center gap-2">
+          <span class="text-[13px] text-ink2 bg-white border border-line rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+            2026年10月
+          </span>
+        </div>
+      </div>
+      <button onclick="openModal()" class="bg-brand hover:bg-brand-600 text-white text-sm font-medium rounded-lg px-4 py-2 flex items-center gap-1.5 shadow-sm transition">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        记一笔
+      </button>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6">
+
+      <!-- ============ 仪表盘 ============ -->
+      <section id="view-dashboard" class="space-y-5">
+        <!-- KPI -->
+        <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="card p-5">
+            <div class="text-[13px] text-ink2">本月收入</div>
+            <div class="mt-2 flex items-end gap-2">
+              <span class="text-[26px] font-semibold leading-none num text-goodText">4.6万</span>
+              <span class="text-xs text-muted mb-0.5 num">¥46,000</span>
+            </div>
+            <div class="mt-2 text-xs text-goodText">↑ 4.5% 较上月</div>
+          </div>
+          <div class="card p-5">
+            <div class="text-[13px] text-ink2">本月支出</div>
+            <div class="mt-2 flex items-end gap-2">
+              <span class="text-[26px] font-semibold leading-none num text-bad">3.3万</span>
+              <span class="text-xs text-muted mb-0.5 num">¥32,500</span>
+            </div>
+            <div class="mt-2 text-xs text-bad">↑ 3.2% 较上月</div>
+          </div>
+          <div class="card p-5">
+            <div class="text-[13px] text-ink2">本月结余</div>
+            <div class="mt-2 flex items-end gap-2">
+              <span class="text-[26px] font-semibold leading-none num text-goodText">1.4万</span>
+              <span class="text-xs text-muted mb-0.5 num">¥13,500</span>
+            </div>
+            <div class="mt-2 text-xs text-goodText">↑ ¥1,000 较上月</div>
+          </div>
+          <div class="card p-5 border-brand/20 bg-gradient-to-br from-brand-50 to-surface">
+            <div class="text-[13px] text-ink2">净资产</div>
+            <div class="mt-2 flex items-end gap-2">
+              <span class="text-[26px] font-semibold leading-none num">185万</span>
+              <span class="text-xs text-muted mb-0.5 num">¥1,850,000</span>
+            </div>
+            <div class="mt-2 text-xs text-ink2">其中 <span class="font-semibold text-goodText">流动资产 35万</span> · 房产 200万</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <!-- 趋势 -->
+          <div class="card p-5 xl:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <div class="font-medium text-[15px]">月度收支趋势</div>
+                <div class="text-xs text-muted mt-0.5">近 12 个月（2025-11 ~ 2026-10）</div>
+              </div>
+              <div class="flex items-center gap-3 text-xs text-ink2">
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#0ca30c"></span>收入</span>
+                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#d03b3b"></span>支出</span>
+              </div>
+            </div>
+            <div class="h-60"><canvas id="chart-trend"></canvas></div>
+          </div>
+
+          <!-- 分类 -->
+          <div class="card p-5">
+            <div class="font-medium text-[15px] mb-1">本月支出分类</div>
+            <div class="text-xs text-muted mb-4">钱花去了哪</div>
+            <div class="h-60"><canvas id="chart-category"></canvas></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <!-- 按成员 -->
+          <div class="card p-5 xl:col-span-1">
+            <div class="font-medium text-[15px] mb-1">本月支出 · 按成员</div>
+            <div class="text-xs text-muted mb-4">谁花了多少</div>
+            <div class="space-y-4" id="member-breakdown"></div>
+          </div>
+
+          <!-- 最近流水 -->
+          <div class="card p-5 xl:col-span-2">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-medium text-[15px]">最近流水</div>
+              <button onclick="switchView('transactions')" class="text-[13px] text-brand hover:text-brand-700 py-1 px-2 -my-1 -mx-2">查看全部 →</button>
+            </div>
+            <div class="overflow-x-auto -mx-5 px-5">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-xs text-muted border-b border-line">
+                    <th class="pb-2.5 font-medium">日期</th>
+                    <th class="pb-2.5 font-medium">类别</th>
+                    <th class="pb-2.5 font-medium">归属</th>
+                    <th class="pb-2.5 font-medium">备注</th>
+                    <th class="pb-2.5 font-medium text-right">金额</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-tx" class="divide-y divide-line"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 流水 ============ -->
+      <section id="view-transactions" class="hidden space-y-5">
+        <div class="card p-5">
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="seg-btn inline-flex rounded-lg border border-line bg-page p-1">
+              <button class="px-3 py-1.5 text-sm rounded-md bg-surface shadow-sm font-medium">全部</button>
+              <button class="px-3 py-1.5 text-sm rounded-md text-ink2">收入</button>
+              <button class="px-3 py-1.5 text-sm rounded-md text-ink2">支出</button>
+            </div>
+            <select id="tx-cat-filter" class="text-sm border border-line rounded-lg px-3 py-1.5 bg-surface text-ink2">
+              <option>全部类别</option>
+            </select>
+            <select class="text-sm border border-line rounded-lg px-3 py-1.5 bg-surface text-ink2">
+              <option>全部成员</option><option>我</option><option>媳妇</option><option>共同</option>
+            </select>
+            <select class="text-sm border border-line rounded-lg px-3 py-1.5 bg-surface text-ink2">
+              <option>2026年10月</option><option>2026年9月</option><option>2026年8月</option>
+            </select>
+            <div class="flex-1"></div>
+            <div class="text-sm text-ink2">本月 <span class="font-semibold num text-goodText">46,000</span> 收 · <span class="font-semibold num text-bad">32,500</span> 支</div>
+          </div>
+        </div>
+
+        <div class="card overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs text-muted border-b border-line bg-page">
+                <th class="px-5 py-3 font-medium">日期</th>
+                <th class="px-5 py-3 font-medium">类别</th>
+                <th class="px-5 py-3 font-medium">归属</th>
+                <th class="px-5 py-3 font-medium">备注</th>
+                <th class="px-5 py-3 font-medium text-right">金额</th>
+                <th class="px-5 py-3 font-medium text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tx-table" class="divide-y divide-line"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ============ 报表 ============ -->
+      <section id="view-reports" class="hidden space-y-5">
+        <div class="grid grid-cols-2 xl:grid-cols-4 gap-4" id="report-kpis"></div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <div class="card p-5 xl:col-span-2">
+            <div class="font-medium text-[15px] mb-1">每月结余</div>
+            <div class="text-xs text-muted mb-4">收入 − 支出，回答「能不能存下钱」</div>
+            <div class="h-72"><canvas id="chart-savings"></canvas></div>
+          </div>
+          <div class="card p-5">
+            <div class="font-medium text-[15px] mb-1">全年支出构成</div>
+            <div class="text-xs text-muted mb-4">各类别占比</div>
+            <div class="h-72"><canvas id="chart-composition"></canvas></div>
+          </div>
+        </div>
+
+        <div class="card overflow-hidden">
+          <div class="px-5 py-4 font-medium text-[15px] border-b border-line">近 6 个月收支明细</div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs text-muted border-b border-line">
+                  <th class="px-5 py-2.5 font-medium">月份</th><th class="px-5 py-2.5 font-medium text-right">收入</th>
+                  <th class="px-5 py-2.5 font-medium text-right">支出</th><th class="px-5 py-2.5 font-medium text-right">结余</th>
+                  <th class="px-5 py-2.5 font-medium text-right">储蓄率</th>
+                </tr>
+              </thead>
+              <tbody id="report-table" class="divide-y divide-line"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 资产负债 ============ -->
+      <section id="view-balance" class="hidden space-y-5">
+        <div class="card p-6 bg-gradient-to-br from-brand-50 to-surface border-brand/20">
+          <div class="text-sm text-ink2">净资产</div>
+          <div class="mt-1 flex items-end gap-2">
+            <span class="text-[40px] font-semibold leading-none num">185万</span>
+            <span class="text-sm text-muted mb-1 num">¥1,850,000</span>
+          </div>
+          <div class="mt-3 flex flex-wrap gap-6 text-sm">
+            <div><span class="text-muted">总资产</span> <span class="font-semibold num">240万</span></div>
+            <div><span class="text-muted">流动资产</span> <span class="font-semibold num text-goodText">35万</span></div>
+            <div><span class="text-muted">总负债</span> <span class="font-semibold num text-bad">55万</span></div>
+            <div><span class="text-muted">资产负债率</span> <span class="font-semibold num">22.9%</span> <span class="text-xs text-muted">（负债占总资产比重）</span></div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-medium text-[15px]">资产</div>
+              <button class="text-xs text-brand font-medium py-1 px-2 -my-1 -mx-2">＋ 添加资产</button>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between border border-line rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-black/[.04] grid place-items-center text-base">🏠</span><div><div class="text-sm font-medium">自住房产</div><div class="text-xs text-muted">房产 · 共同</div></div></div>
+                <div class="text-sm font-semibold num">200万</div>
+              </div>
+              <div class="flex items-center justify-between border border-line rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-black/[.04] grid place-items-center text-base">🏦</span><div><div class="text-sm font-medium">存款</div><div class="text-xs text-muted">存款/现金 · 我</div></div></div>
+                <div class="text-sm font-semibold num text-goodText">35万</div>
+              </div>
+              <div class="flex items-center justify-between border border-line rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-black/[.04] grid place-items-center text-base">🚗</span><div><div class="text-sm font-medium">汽车</div><div class="text-xs text-muted">车 · 共同</div></div></div>
+                <div class="text-sm font-semibold num">5万</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-medium text-[15px]">负债</div>
+              <button class="text-xs text-brand font-medium py-1 px-2 -my-1 -mx-2">＋ 添加负债</button>
+            </div>
+            <div class="space-y-3">
+              <div class="flex items-center justify-between border border-line rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-black/[.04] grid place-items-center text-base">🏠</span><div><div class="text-sm font-medium">房贷余额</div><div class="text-xs text-muted">房贷 · 共同</div></div></div>
+                <div class="text-sm font-semibold num text-bad">50万</div>
+              </div>
+              <div class="flex items-center justify-between border border-line rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-black/[.04] grid place-items-center text-base">💳</span><div><div class="text-sm font-medium">信用卡欠款</div><div class="text-xs text-muted">信用卡 · 我</div></div></div>
+                <div class="text-sm font-semibold num text-bad">3万</div>
+              </div>
+              <div class="flex items-center justify-between border border-line rounded-xl px-4 py-3">
+                <div class="flex items-center gap-3"><span class="w-8 h-8 rounded-lg bg-black/[.04] grid place-items-center text-base">🚗</span><div><div class="text-sm font-medium">车贷余额</div><div class="text-xs text-muted">车贷 · 我</div></div></div>
+                <div class="text-sm font-semibold num text-bad">2万</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card p-5">
+          <div class="text-sm text-muted">💡 每月底回来更新一次余额即可，净资产会自动重算。这里不用精确到分，记个大概就好。</div>
+        </div>
+      </section>
+
+      <!-- ============ 分类管理 ============ -->
+      <section id="view-categories" class="hidden space-y-5">
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-medium text-[15px]">支出分类</div>
+              <button class="text-xs text-brand font-medium py-1 px-2 -my-1 -mx-2">＋ 新建</button>
+            </div>
+            <div class="space-y-1.5" id="cat-mgmt-exp"></div>
+          </div>
+          <div class="card p-5">
+            <div class="flex items-center justify-between mb-4">
+              <div class="font-medium text-[15px]">收入分类</div>
+              <button class="text-xs text-brand font-medium py-1 px-2 -my-1 -mx-2">＋ 新建</button>
+            </div>
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-black/[.02] text-sm"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:#0ca30c"></span>💼 工资</span><span class="text-muted text-xs">用「归属」区分是谁</span></div>
+              <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-black/[.02] text-sm"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:#0ca30c"></span>📚 补课</span></div>
+              <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-black/[.02] text-sm"><span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:#0ca30c"></span>💰 其他</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- ===== 记一笔 弹窗 ===== -->
+<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center" role="dialog" aria-modal="true" aria-label="记一笔">
+  <div class="absolute inset-0 bg-black/40" onclick="closeModal()"></div>
+  <div class="relative bg-surface rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between px-6 pt-5 pb-3">
+      <div class="font-semibold text-lg">记一笔</div>
+      <button onclick="closeModal()" class="text-muted hover:text-ink p-2 -m-2 rounded-lg"><svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+    </div>
+
+    <div class="px-6 pb-6 space-y-5">
+      <!-- 收入/支出切换 -->
+      <div class="seg-btn grid grid-cols-2 gap-1 rounded-xl bg-page border border-line p-1" id="dir-toggle">
+        <button data-dir="expense" class="py-2 rounded-lg text-sm font-medium bg-surface shadow-sm">支出</button>
+        <button data-dir="income" class="py-2 rounded-lg text-sm font-medium text-ink2">收入</button>
+      </div>
+
+      <!-- 金额 -->
+      <div>
+        <div class="text-xs text-ink2 mb-1.5">金额（元）</div>
+        <div class="flex items-center border border-line rounded-xl px-4 py-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20">
+          <span class="text-xl text-muted mr-2">¥</span>
+          <input id="amt" type="number" inputmode="numeric" placeholder="0" class="w-full text-2xl font-semibold outline-none bg-transparent num" />
+        </div>
+      </div>
+
+      <!-- 常用项 -->
+      <div>
+        <div class="text-xs text-ink2 mb-1.5">常用项（点一下自动填）</div>
+        <div class="flex flex-wrap gap-2" id="common-row"></div>
+      </div>
+
+      <!-- 类别 -->
+      <div>
+        <div class="text-xs text-ink2 mb-1.5">类别</div>
+        <div class="grid grid-cols-4 gap-2" id="cat-grid"></div>
+      </div>
+
+      <!-- 归属 + 日期 -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <div class="text-xs text-ink2 mb-1.5">归属</div>
+          <div class="seg-btn grid grid-cols-3 gap-1 rounded-lg bg-page border border-line p-1" id="owner-toggle">
+            <button data-owner="我" class="py-1.5 rounded-md text-xs font-medium bg-surface shadow-sm">我</button>
+            <button data-owner="媳妇" class="py-1.5 rounded-md text-xs font-medium text-ink2">媳妇</button>
+            <button data-owner="共同" class="py-1.5 rounded-md text-xs font-medium text-ink2">共同</button>
+          </div>
+        </div>
+        <div>
+          <div class="text-xs text-ink2 mb-1.5">日期</div>
+          <input id="date" type="date" class="w-full border border-line rounded-lg px-3 py-1.5 text-sm bg-surface" />
+        </div>
+      </div>
+
+      <!-- 备注 -->
+      <div>
+        <div class="text-xs text-ink2 mb-1.5">备注（可选）</div>
+        <input type="text" placeholder="写点备注…" class="w-full border border-line rounded-lg px-3 py-2 text-sm bg-surface focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none" />
+      </div>
+
+      <div class="flex gap-3 pt-1">
+        <button onclick="closeModal()" class="flex-1 py-2.5 rounded-lg border border-line text-sm font-medium text-ink2 hover:bg-black/[.03]">取消</button>
+        <button onclick="saveTx()" class="flex-1 py-2.5 rounded-lg bg-brand hover:bg-brand-600 text-white text-sm font-medium">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================= 数据 ================= */
+const MONTHS = ['25/11','25/12','26/01','26/02','26/03','26/04','26/05','26/06','26/07','26/08','26/09','26/10'];
+const income  = [46000,45000,47000,44000,48000,45000,46000,47000,45000,46000,44000,46000];
+const expense = [33500,32000,34000,31000,35000,32500,33000,34000,32000,32500,31500,32500];
+const balance = income.map((v,i) => v - expense[i]);
+
+const EXP_CATS = [
+  {name:'房贷', icon:'🏠', color:'#2a78d6', m:12000, sub:'房贷/房租'},
+  {name:'吃喝', icon:'🍚', color:'#eb6834', m:5000, sub:'买菜 / 外出吃'},
+  {name:'孩子', icon:'🧒', color:'#1baf7a', m:4500, sub:'教育 / 兴趣班 / 用品'},
+  {name:'购物', icon:'🛒', color:'#eda100', m:3500, sub:'购物 / 网购 / 娱乐'},
+  {name:'交通', icon:'🚗', color:'#e87ba4', m:2500, sub:'交通 / 汽车'},
+  {name:'保险', icon:'🛡️', color:'#008300', m:2000, sub:'商业 / 车险'},
+  {name:'水电煤', icon:'💡', color:'#6250d6', m:1800, sub:'水电煤通讯'},
+  {name:'其他', icon:'📦', color:'#e34948', m:1200, sub:''},
+];
+const INC_CATS = [
+  {name:'工资', icon:'💼', color:'#0ca30c'},
+  {name:'补课', icon:'📚', color:'#0ca30c'},
+  {name:'其他', icon:'💰', color:'#0ca30c'},
+];
+const ANNUAL_CATS = [
+  {name:'房贷', color:'#2a78d6', a:144000},
+  {name:'吃喝', color:'#eb6834', a:61500},
+  {name:'孩子', color:'#1baf7a', a:54500},
+  {name:'购物', color:'#eda100', a:42000},
+  {name:'交通', color:'#e87ba4', a:30000},
+  {name:'保险', color:'#008300', a:24000},
+  {name:'水电煤', color:'#6250d6', a:22500},
+  {name:'其他', color:'#e34948', a:15000},
+];
+const MEMBERS = [
+  {name:'我', icon:'我', color:'#2a78d6', m:15000},
+  {name:'媳妇', icon:'媳', color:'#eb6834', m:7500},
+  {name:'共同', icon:'共', color:'#1baf7a', m:10000},
+];
+
+/* 流水样本 */
+const TX = [
+  ['10-10','🛒 购物','我','网购日用品',-450],
+  ['10-09','🏠 房贷','共同','10月房贷',-12000],
+  ['10-08','💼 工资','我','10月工资',30000],
+  ['10-07','🍚 吃喝','我','超市采购',-860],
+  ['10-06','🧒 孩子','共同','兴趣班续费',-2000],
+  ['10-05','💼 工资','媳妇','10月工资',14000],
+  ['10-04','🚗 交通','我','加油',-400],
+  ['10-03','📚 补课','媳妇','补课收入',2000],
+  ['10-02','💡 水电煤','共同','水电费',-520],
+  ['10-01','🛡️ 保险','共同','商业保险',-1800],
+];
+
+/* ================= 工具 ================= */
+function fmtWan(v){ const w = v/10000; if(w >= 100) return Math.round(w)+'万'; return (Math.round(w*10)/10)+'万'; }
+function fmtYuan(v){ return '¥' + v.toLocaleString('zh-CN'); }
+function fmtSigned(v){ return (v>=0?'+':'') + v.toLocaleString('zh-CN'); }
+
+Chart.defaults.font.family = 'system-ui, -apple-system, "PingFang SC", sans-serif';
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#6b6a63';
+const INK = '#6b6a63', GRID = '#e1e0d9', AXIS = '#c3c2b7', INK2 = '#52514e';
+const GREEN = '#0ca30c', RED = '#d03b3b';
+
+/* 数值标签插件（横向条形图右端） */
+const valueLabels = {
+  id: 'valueLabels',
+  afterDatasetsDraw(chart){
+    const meta = chart.getDatasetMeta(0);
+    if(!meta) return;
+    meta.data.forEach((bar, i) => {
+      const v = chart.data.datasets[0].data[i];
+      chart.ctx.save();
+      chart.ctx.fillStyle = INK2;
+      chart.ctx.font = '500 11px system-ui, sans-serif';
+      chart.ctx.textAlign = 'left';
+      chart.ctx.textBaseline = 'middle';
+      chart.ctx.fillText(fmtYuan(v), bar.x + 8, bar.y);
+      chart.ctx.restore();
+    });
+  }
+};
+/* 环形图中心文字 */
+let _donutTotal = 0;
+const centerText = {
+  id: 'centerText',
+  afterDraw(chart){
+    if(chart.config.type !== 'doughnut') return;
+    const {ctx, chartArea} = chart;
+    const total = _donutTotal;
+    if(!total) return;
+    const cx = (chartArea.left + chartArea.right)/2;
+    const cy = (chartArea.top + chartArea.bottom)/2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = INK2; ctx.font = '11px system-ui, sans-serif';
+    ctx.fillText('全年支出', cx, cy - 10);
+    ctx.fillStyle = '#0b0b0b'; ctx.font = '600 17px system-ui, sans-serif';
+    ctx.fillText(fmtWan(total), cx, cy + 12);
+    ctx.restore();
+  }
+};
+
+/* ================= 视图切换 ================= */
+const TITLES = { dashboard:'仪表盘', transactions:'流水', reports:'报表', balance:'资产负债', categories:'分类管理' };
+function switchView(name){
+  Object.keys(TITLES).forEach(v => document.getElementById('view-'+v).classList.toggle('hidden', v !== name));
+  document.getElementById('page-title').textContent = TITLES[name];
+  document.querySelectorAll('[data-view]').forEach(b => {
+    const on = b.dataset.view === name;
+    b.classList.toggle('text-brand', on);
+    b.classList.toggle('bg-brand/10', on);
+    b.classList.toggle('text-ink2', !on);
+    b.classList.toggle('hover:bg-black/[.04]', !on);
+  });
+  if(name === 'reports') ensureReportCharts();
+}
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+/* ================= 记一笔弹窗 ================= */
+const modal = document.getElementById('modal');
+let curDir = 'expense', curCat = '房贷', curOwner = '我';
+
+function openModal(){
+  modal.classList.remove('hidden'); modal.classList.add('flex');
+  document.getElementById('date').value = new Date().toISOString().slice(0,10);
+  setTimeout(()=>document.getElementById('amt').focus(), 50);
+}
+function closeModal(){ modal.classList.add('hidden'); modal.classList.remove('flex'); }
+function toast(msg){
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-ink text-surface text-sm px-4 py-2.5 rounded-lg shadow-lg z-[60]';
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 1800);
+}
+function saveTx(){
+  const amt = document.getElementById('amt').value;
+  if(!amt || +amt <= 0){ document.getElementById('amt').focus(); toast('请填写金额'); return; }
+  closeModal();
+  toast('已保存：' + (curDir==='expense'?'-':'+') + ' ¥' + Number(amt).toLocaleString());
+}
+
+function renderCats(){
+  const grid = document.getElementById('cat-grid');
+  const cats = curDir === 'expense' ? EXP_CATS : INC_CATS;
+  grid.innerHTML = cats.map(c => `
+    <button data-cat="${c.name}" class="cat flex flex-col items-center gap-1 py-2.5 rounded-lg border text-xs ${c.name===curCat?'border-brand bg-brand-50 text-brand':'border-line hover:border-brand hover:bg-brand-50'}">
+      <span class="text-xl">${c.icon}</span>${c.name}
+    </button>`).join('');
+  grid.querySelectorAll('.cat').forEach(b => b.addEventListener('click', () => {
+    curCat = b.dataset.cat;
+    grid.querySelectorAll('.cat').forEach(x => { x.classList.remove('border-brand','bg-brand-50','text-brand'); x.classList.add('border-line'); });
+    b.classList.add('border-brand','bg-brand-50','text-brand'); b.classList.remove('border-line');
+  }));
+}
+function setDir(d){
+  curDir = d;
+  curCat = d === 'expense' ? '房贷' : '工资';
+  document.querySelectorAll('#dir-toggle button').forEach(b => {
+    const on = b.dataset.dir === d;
+    b.classList.toggle('bg-surface', on); b.classList.toggle('shadow-sm', on);
+    b.classList.toggle('text-ink2', !on); b.classList.toggle('text-ink', on);
+  });
+  const amt = document.getElementById('amt');
+  amt.classList.toggle('text-goodText', d === 'income');
+  amt.classList.toggle('text-bad', d === 'expense');
+  renderCats();
+}
+function setOwner(o){
+  curOwner = o;
+  document.querySelectorAll('#owner-toggle button').forEach(b => {
+    const on = b.dataset.owner === o;
+    b.classList.toggle('bg-surface', on); b.classList.toggle('shadow-sm', on);
+    b.classList.toggle('text-ink2', !on); b.classList.toggle('text-ink', on);
+  });
+}
+function fillCommon(dir, cat, amt, owner){
+  setDir(dir); setOwner(owner); curCat = cat;
+  document.getElementById('amt').value = amt;
+  renderCats();
+}
+document.getElementById('dir-toggle').addEventListener('click', e => { if(e.target.dataset.dir) setDir(e.target.dataset.dir); });
+document.getElementById('owner-toggle').addEventListener('click', e => { if(e.target.dataset.owner) setOwner(e.target.dataset.owner); });
+document.getElementById('modal').addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); saveTx(); } });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+
+/* 常用项 */
+const COMMON = [
+  {label:'工资 +30,000', dir:'income', cat:'工资', amt:30000, owner:'我'},
+  {label:'房贷 -12,000', dir:'expense', cat:'房贷', amt:12000, owner:'共同'},
+  {label:'水电煤 -300', dir:'expense', cat:'水电煤', amt:300, owner:'共同'},
+  {label:'商业保险 -1,800', dir:'expense', cat:'保险', amt:1800, owner:'共同'},
+];
+document.getElementById('common-row').innerHTML = COMMON.map((c,i) =>
+  `<button data-ci="${i}" class="px-3 py-2 rounded-lg bg-black/[.04] text-sm hover:bg-black/[.07]">${c.label}</button>`).join('');
+document.getElementById('common-row').addEventListener('click', e => {
+  const b = e.target.closest('[data-ci]'); if(!b) return;
+  const c = COMMON[+b.dataset.ci]; fillCommon(c.dir, c.cat, c.amt, c.owner);
+});
+
+/* ================= 图表 ================= */
+const charts = {};
+function ensureDashboardCharts(){
+  if(!charts.trend){
+    charts.trend = new Chart(document.getElementById('chart-trend'), {
+      type:'line',
+      data:{ labels: MONTHS, datasets:[
+        { label:'收入', data: income, borderColor:GREEN, backgroundColor:GREEN, borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:.25 },
+        { label:'支出', data: expense, borderColor:RED, backgroundColor:RED, borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:.25 },
+      ]},
+      options:{
+        responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{display:false},
+          tooltip:{ backgroundColor:'#0b0b0b', padding:10, cornerRadius:8, callbacks:{ label: c => c.dataset.label + ' ' + fmtYuan(c.parsed.y) } } },
+        scales:{
+          x:{ grid:{display:false}, border:{color:AXIS}, ticks:{color:INK, maxTicksLimit:12, maxRotation:0} },
+          y:{ grid:{color:GRID}, border:{display:false}, ticks:{color:INK, callback:v=>fmtWan(v)} },
+        }
+      }
+    });
+  }
+  if(!charts.category){
+    const sorted = [...EXP_CATS].sort((a,b)=>b.m-a.m);
+    charts.category = new Chart(document.getElementById('chart-category'), {
+      type:'bar',
+      data:{ labels: sorted.map(c=>c.name), datasets:[{ data: sorted.map(c=>c.m), backgroundColor: sorted.map(c=>c.color), borderRadius:4, borderSkipped:false, barThickness:16 }]},
+      options:{
+        indexAxis:'y', responsive:true, maintainAspectRatio:false, layout:{ padding:{ right:56 } },
+        plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#0b0b0b', padding:10, cornerRadius:8, callbacks:{ label: c => fmtYuan(c.parsed.x) } } },
+        scales:{
+          x:{ grid:{color:GRID}, border:{display:false}, ticks:{color:INK, callback:v=>fmtWan(v)} },
+          y:{ grid:{display:false}, border:{color:AXIS}, ticks:{color:INK2, font:{size:12}} },
+        }
+      },
+      plugins:[valueLabels]
+    });
+  }
+}
+
+function ensureReportCharts(){
+  if(!charts.savings){
+    charts.savings = new Chart(document.getElementById('chart-savings'), {
+      type:'bar',
+      data:{ labels: MONTHS, datasets:[{ label:'结余', data: balance, backgroundColor: GREEN, borderRadius:4, borderSkipped:false, barThickness:14 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#0b0b0b', padding:10, cornerRadius:8, callbacks:{ label: c => '结余 ' + fmtYuan(c.parsed.y) } } },
+        scales:{
+          x:{ grid:{display:false}, border:{color:AXIS}, ticks:{color:INK, maxTicksLimit:12, maxRotation:0} },
+          y:{ grid:{color:GRID}, border:{display:false}, ticks:{color:INK, callback:v=>fmtWan(v)} },
+        }
+      }
+    });
+  }
+  if(!charts.composition){
+    const sorted = [...ANNUAL_CATS].sort((a,b)=>b.a-a.a);
+    _donutTotal = ANNUAL_TOTAL;
+    charts.composition = new Chart(document.getElementById('chart-composition'), {
+      type:'doughnut',
+      data:{ labels: sorted.map(c=>c.name), datasets:[{ data: sorted.map(c=>c.a), backgroundColor: sorted.map(c=>c.color), borderColor:'#fcfcfb', borderWidth:2 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false, cutout:'62%',
+        plugins:{ legend:{position:'right', labels:{boxWidth:10, boxHeight:10, padding:8, usePointStyle:true, color:INK2}},
+          tooltip:{ backgroundColor:'#0b0b0b', padding:10, cornerRadius:8, callbacks:{ label: c => c.label + ' ' + fmtYuan(c.parsed) + '（' + Math.round(c.parsed/ANNUAL_TOTAL*100) + '%）' } } }
+      },
+      plugins:[centerText]
+    });
+  }
+}
+
+/* ================= 渲染静态区 ================= */
+const ANNUAL_TOTAL = expense.reduce((a,b)=>a+b,0);
+
+/* 按成员 */
+document.getElementById('member-breakdown').innerHTML = MEMBERS.map(m => {
+  const pct = Math.round(m.m/32500*100);
+  return `<div>
+    <div class="flex items-center justify-between text-sm mb-1.5">
+      <span class="flex items-center gap-2"><span class="w-5 h-5 rounded-full grid place-items-center text-[10px] text-white" style="background:${m.color}">${m.icon}</span>${m.name}</span>
+      <span class="num font-medium">${fmtWan(m.m)}</span>
+    </div>
+    <div class="h-2 rounded-full bg-black/[.05] overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${m.color}"></div></div>
+  </div>`;
+}).join('');
+
+/* 流水表格 */
+function txRowHtml(r){
+  const [d, cat, owner, note, amt] = r;
+  return `<tr class="hover:bg-black/[.02]">
+    <td class="px-5 py-2.5 num text-ink2">${d}</td>
+    <td class="px-5 py-2.5">${cat}</td>
+    <td class="px-5 py-2.5"><span class="text-xs px-2 py-0.5 rounded-full bg-black/[.05] text-ink2">${owner}</span></td>
+    <td class="px-5 py-2.5 text-muted">${note}</td>
+    <td class="px-5 py-2.5 text-right font-medium num ${amt>=0?'text-goodText':'text-bad'}">${fmtSigned(amt)}</td>
+    <td class="px-5 py-2.5 text-right"><button class="text-muted hover:text-ink text-xs py-1 px-2">编辑</button></td>
+  </tr>`;
+}
+document.getElementById('tx-table').innerHTML = TX.map(txRowHtml).join('');
+document.getElementById('recent-tx').innerHTML = TX.slice(0,5).map(r => {
+  const [d, cat, owner, note, amt] = r;
+  return `<tr class="hover:bg-black/[.02]">
+    <td class="py-2.5 text-ink2 num">${d}</td>
+    <td class="py-2.5">${cat}</td>
+    <td class="py-2.5"><span class="text-xs px-2 py-0.5 rounded-full bg-black/[.05] text-ink2">${owner}</span></td>
+    <td class="py-2.5 text-muted">${note}</td>
+    <td class="py-2.5 text-right font-medium num ${amt>=0?'text-goodText':'text-bad'}">${fmtSigned(amt)}</td>
+  </tr>`;
+}).join('');
+
+/* 流水筛选器类别 */
+document.getElementById('tx-cat-filter').innerHTML = '<option>全部类别</option>' +
+  EXP_CATS.map(c=>`<option>${c.name}</option>`).join('') +
+  INC_CATS.map(c=>`<option>${c.name}</option>`).join('');
+
+/* 分类管理 */
+document.getElementById('cat-mgmt-exp').innerHTML = EXP_CATS.map(c => `
+  <div class="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-black/[.02] text-sm">
+    <span class="flex items-center gap-2"><span class="w-2 h-2 rounded-full" style="background:${c.color}"></span>${c.icon} ${c.name}</span>
+    ${c.sub ? `<span class="text-muted text-xs">· ${c.sub}</span>` : ''}
+  </div>`).join('');
+
+/* 报表 KPI */
+const ANNUAL_IN = income.reduce((a,b)=>a+b,0);
+const ANNUAL_OUT = expense.reduce((a,b)=>a+b,0);
+const ANNUAL_BAL = ANNUAL_IN - ANNUAL_OUT;
+const SAV_RATE = (ANNUAL_BAL / ANNUAL_IN * 100).toFixed(1);
+document.getElementById('report-kpis').innerHTML = `
+  <div class="card p-5"><div class="text-[13px] text-ink2">年收入</div><div class="mt-2 text-[24px] font-semibold num text-goodText">${fmtWan(ANNUAL_IN)}</div><div class="mt-1 text-xs text-muted">${fmtYuan(ANNUAL_IN)}</div></div>
+  <div class="card p-5"><div class="text-[13px] text-ink2">年支出</div><div class="mt-2 text-[24px] font-semibold num text-bad">${fmtWan(ANNUAL_OUT)}</div><div class="mt-1 text-xs text-muted">${fmtYuan(ANNUAL_OUT)}</div></div>
+  <div class="card p-5"><div class="text-[13px] text-ink2">年结余</div><div class="mt-2 text-[24px] font-semibold num text-goodText">${fmtWan(ANNUAL_BAL)}</div><div class="mt-1 text-xs text-muted">储蓄率 ${SAV_RATE}%</div></div>
+  <div class="card p-5"><div class="text-[13px] text-ink2">月均结余</div><div class="mt-2 text-[24px] font-semibold num">${fmtWan(Math.round(ANNUAL_BAL/12))}</div><div class="mt-1 text-xs text-muted">${fmtYuan(Math.round(ANNUAL_BAL/12))}</div></div>`;
+
+/* 报表明细表（近6个月，倒序） */
+const MONTH_FULL = ['2025-11','2025-12','2026-01','2026-02','2026-03','2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10'];
+document.getElementById('report-table').innerHTML = [11,10,9,8,7,6].map(i => {
+  const bal = income[i]-expense[i];
+  const rate = (bal/income[i]*100).toFixed(1);
+  return `<tr class="hover:bg-black/[.02]">
+    <td class="px-5 py-2.5 num">${MONTH_FULL[i]}</td>
+    <td class="px-5 py-2.5 num text-right text-goodText">${income[i].toLocaleString()}</td>
+    <td class="px-5 py-2.5 num text-right text-bad">${expense[i].toLocaleString()}</td>
+    <td class="px-5 py-2.5 num text-right text-goodText">${bal.toLocaleString()}</td>
+    <td class="px-5 py-2.5 num text-right">${rate}%</td>
+  </tr>`;
+}).join('');
+
+/* ================= 启动 ================= */
+setDir('expense');
+renderCats();
+ensureDashboardCharts();
+</script>
+</body>
+</html>
