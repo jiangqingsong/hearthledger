@@ -13,6 +13,9 @@ backend/backups/
 frontend/node_modules/
 frontend/dist/
 
+# Deployment secrets
+.env
+
 # IDE / OS
 .idea/
 .vscode/

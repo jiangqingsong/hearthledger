@@ -1,0 +1,23 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      HEARTHLEDGER_DB: /data/hearthledger.db
+      HEARTHLEDGER_USERNAME: ${HEARTHLEDGER_USERNAME:-admin}
+      HEARTHLEDGER_PASSWORD: ${HEARTHLEDGER_PASSWORD:?HEARTHLEDGER_PASSWORD is required — set it in .env}
+    volumes:
+      - hearthledger_data:/data
+      - hearthledger_backups:/app/backups
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  hearthledger_data:
+  hearthledger_backups:
