@@ -50,7 +50,7 @@ systemctl restart docker
 
 ### 开放安全组端口（关键，最常漏）
 
-阿里云控制台 → ECS → 实例 → 安全组 → 入方向规则，添加：协议 `TCP`、端口 `80/80`、授权对象 `0.0.0.0/0`（或限定你家 IP 更安全）。否则即使服务跑起来也访问不到。
+阿里云控制台 → ECS → 实例 → 安全组 → 入方向规则，添加：协议 `TCP`、端口 `8080/8080`、授权对象 `0.0.0.0/0`（或限定你家 IP 更安全）。否则即使服务跑起来也访问不到。
 
 ---
 
@@ -164,10 +164,10 @@ cd /opt/hearthledger && docker compose up -d --build
 
 ## 首次访问验证
 
-浏览器打开 `http://服务器公网IP/`，应看到登录页，用 `.env` 里设的账号密码登录。健康检查：
+浏览器打开 `http://服务器公网IP:8080/`，应看到登录页，用 `.env` 里设的账号密码登录。健康检查：
 
 ```bash
-curl http://127.0.0.1/api/health   # 应返回 {"ok":true}
+curl http://127.0.0.1:8080/api/health   # 应返回 {"ok":true}
 ```
 
 ---
@@ -199,9 +199,9 @@ docker run --rm -v hearthledger_backups:/backups -v "$PWD":/out alpine tar czf /
 
 | 现象 | 处理 |
 |---|---|
-| 浏览器打不开 / 一直转圈 | 检查安全组是否放行 80；`docker compose ps` 是否两容器都在跑 |
+| 浏览器打不开 / 一直转圈 | 检查安全组是否放行 8080；`docker compose ps` 是否两容器都在跑 |
 | 构建拉镜像超时（`i/o timeout`） | 未配镜像加速，回「通用前置」第 3 步 |
-| `80 端口被占用` | `docker-compose.yml` 里 `"80:80"` 改 `"8080:80"`，安全组放行 8080，访问 `http://IP:8080/` |
+| `8080 端口被占用` | `docker-compose.yml` 里 `"8080:80"` 改其他端口（如 `"9090:80"`），安全组放行对应端口，访问 `http://IP:9090/` |
 | Actions 报 `Permission denied (publickey)` | 公钥没放对 / `SSH_HOST` 填错 / `SSH_PRIVATE_KEY` 漏了首尾行 |
 | Actions 报 `HEARTHLEDGER_PASSWORD is required` | 服务器 `.env` 没建或密码为空 |
 | 登录提示「用户名或密码错误」 | 账号只在首次创建，改 `.env` 不覆盖旧密码；想换密码在应用内用「修改密码」 |
@@ -211,5 +211,5 @@ docker run --rm -v hearthledger_backups:/backups -v "$PWD":/out alpine tar czf /
 ## 下一步（强烈建议）
 
 1. **加域名 + HTTPS**：域名解析到服务器 IP，用 Let's Encrypt 或阿里云免费证书给 Nginx 上 HTTPS，登录密码不再明文传输。
-2. **收紧安全组**：80 端口授权对象从 `0.0.0.0/0` 改成你家固定 IP。
+2. **收紧安全组**：8080 端口授权对象从 `0.0.0.0/0` 改成你家固定 IP。
 3. **专用部署用户**：用受限用户（能跑 docker + 写 `/opt/hearthledger`）替代 `root` 跑部署，降低风险。
